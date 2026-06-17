@@ -13,12 +13,12 @@ The console is engineered to survive all **Chaos Mode** failure modes — connec
 
 ## Key Features
 
-| Feature | Description |
-| :--- | :--- |
-| **Strict Sequenced Rendering** | All packets are buffered and sorted by sequence number before any DOM commit. |
-| **Layout-Shift-Free Streaming** | Structured content block arrays allow tool card insertions to interrupt and resume streaming without visual artifacts. |
-| **Lazy Differential Trees** | Deep recursive JSON differences are computed and mounted lazily, enabling instant renders of 500 KB+ state models. |
-| **Stale Connection Guards** | Double-buffered socket listeners prevent asynchronous callback pollution from discarded sockets during reconnect cycles. |
+| Feature                         | Description                                                                                                              |
+| :------------------------------ | :----------------------------------------------------------------------------------------------------------------------- |
+| **Strict Sequenced Rendering**  | All packets are buffered and sorted by sequence number before any DOM commit.                                            |
+| **Layout-Shift-Free Streaming** | Structured content block arrays allow tool card insertions to interrupt and resume streaming without visual artifacts.   |
+| **Lazy Differential Trees**     | Deep recursive JSON differences are computed and mounted lazily, enabling instant renders of 500 KB+ state models.       |
+| **Stale Connection Guards**     | Double-buffered socket listeners prevent asynchronous callback pollution from discarded sockets during reconnect cycles. |
 
 ---
 
@@ -43,30 +43,30 @@ graph TD
 
 ## Chaos Mode Resiliency Matrix
 
-| Failure Mode | Server Behaviour | Client Resiliency Mechanism |
-| :--- | :--- | :--- |
-| **Connection Drop Mid-Stream** | Socket forcefully terminated mid-sentence. | Exponential-backoff reconnect (capped at 10 s). Sends `RESUME(last_seq)` on reconnect; server replays missed events, client deduplicates and stitches them in order. |
-| **Out-of-Order Messages** | Packets delivered in shuffled sequence order. | `ReorderBuffer` holds packets and resolves sequence gaps before releasing consecutive events to the render state. |
-| **Duplicate Frame Delivery** | Identical frames transmitted more than once. | A `Set<number>` of processed sequence IDs discards duplicates in O(1) time. |
-| **Oversized Context Snapshot** | 500 KB+ JSON schema object dispatched. | `diffEngine.ts` computes recursive leaf differences. Tree nodes are mounted lazily — children only enter the DOM on user expansion — keeping initial paint at O(1). |
-| **Corrupt Heartbeat** | `PING` sent with an empty challenge string. | Challenge defaults safely to `""`. A valid `PONG` is echoed immediately to prevent server-side timeout termination. |
-| **Stale Socket Closures** | Old close events fire asynchronously after socket replacement. | Active-socket identity guards (`if (socketRef.current !== ws) return`) on all handlers prevent discarded sockets from resetting the active connection state. |
+| Failure Mode                   | Server Behaviour                                               | Client Resiliency Mechanism                                                                                                                                          |
+| :----------------------------- | :------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Connection Drop Mid-Stream** | Socket forcefully terminated mid-sentence.                     | Exponential-backoff reconnect (capped at 10 s). Sends `RESUME(last_seq)` on reconnect; server replays missed events, client deduplicates and stitches them in order. |
+| **Out-of-Order Messages**      | Packets delivered in shuffled sequence order.                  | `ReorderBuffer` holds packets and resolves sequence gaps before releasing consecutive events to the render state.                                                    |
+| **Duplicate Frame Delivery**   | Identical frames transmitted more than once.                   | A `Set<number>` of processed sequence IDs discards duplicates in O(1) time.                                                                                          |
+| **Oversized Context Snapshot** | 500 KB+ JSON schema object dispatched.                         | `diffEngine.ts` computes recursive leaf differences. Tree nodes are mounted lazily — children only enter the DOM on user expansion — keeping initial paint at O(1).  |
+| **Corrupt Heartbeat**          | `PING` sent with an empty challenge string.                    | Challenge defaults safely to `""`. A valid `PONG` is echoed immediately to prevent server-side timeout termination.                                                  |
+| **Stale Socket Closures**      | Old close events fire asynchronously after socket replacement. | Active-socket identity guards (`if (socketRef.current !== ws) return`) on all handlers prevent discarded sockets from resetting the active connection state.         |
 
 ---
 
 ## WebSocket Protocol Handlers
 
-| Event Type | Direction | Payload Structure | Client Action |
-| :--- | :---: | :--- | :--- |
-| `USER_MESSAGE` | Out | `{"type": "USER_MESSAGE", "content": "..."}` | Resets sequence trackers and transmits user input to the backend. |
-| `CONTEXT_SNAPSHOT` | In | `{"type": "CONTEXT_SNAPSHOT", "seq": N, "data": {...}}` | Parses state variables, runs the diff engine, and renders lazy trees. |
-| `TOKEN` | In | `{"type": "TOKEN", "seq": N, "text": "..."}` | Appends characters to the active chat bubble and groups trace logs. |
-| `TOOL_CALL` | In | `{"type": "TOOL_CALL", "seq": N, "call_id": "..."}` | Bypasses the reorder queue to immediately send `TOOL_ACK`, then enqueues the tool card. |
-| `TOOL_ACK` | Out | `{"type": "TOOL_ACK", "call_id": "..."}` | Acknowledges tool call receipt within the server's 5 s timeout window. |
-| `TOOL_RESULT` | In | `{"type": "TOOL_RESULT", "seq": N, "result": {...}}` | Resolves the pending tool card in-place and resumes token streaming. |
-| `STREAM_END` | In | `{"type": "STREAM_END", "seq": N}` | Finalises the stream and returns the socket status to Connected / Idle. |
-| `PING` / `PONG` | In / Out | `{"type": "PING", "challenge": "..."}` | Verifies connection health; client replies within 3 s. |
-| `RESUME` | Out | `{"type": "RESUME", "last_seq": N}` | Transmits sequence watermark to recover missed server frames after reconnection. |
+| Event Type         | Direction | Payload Structure                                       | Client Action                                                                           |
+| :----------------- | :-------: | :------------------------------------------------------ | :-------------------------------------------------------------------------------------- |
+| `USER_MESSAGE`     |    Out    | `{"type": "USER_MESSAGE", "content": "..."}`            | Resets sequence trackers and transmits user input to the backend.                       |
+| `CONTEXT_SNAPSHOT` |    In     | `{"type": "CONTEXT_SNAPSHOT", "seq": N, "data": {...}}` | Parses state variables, runs the diff engine, and renders lazy trees.                   |
+| `TOKEN`            |    In     | `{"type": "TOKEN", "seq": N, "text": "..."}`            | Appends characters to the active chat bubble and groups trace logs.                     |
+| `TOOL_CALL`        |    In     | `{"type": "TOOL_CALL", "seq": N, "call_id": "..."}`     | Bypasses the reorder queue to immediately send `TOOL_ACK`, then enqueues the tool card. |
+| `TOOL_ACK`         |    Out    | `{"type": "TOOL_ACK", "call_id": "..."}`                | Acknowledges tool call receipt within the server's 5 s timeout window.                  |
+| `TOOL_RESULT`      |    In     | `{"type": "TOOL_RESULT", "seq": N, "result": {...}}`    | Resolves the pending tool card in-place and resumes token streaming.                    |
+| `STREAM_END`       |    In     | `{"type": "STREAM_END", "seq": N}`                      | Finalises the stream and returns the socket status to Connected / Idle.                 |
+| `PING` / `PONG`    | In / Out  | `{"type": "PING", "challenge": "..."}`                  | Verifies connection health; client replies within 3 s.                                  |
+| `RESUME`           |    Out    | `{"type": "RESUME", "last_seq": N}`                     | Transmits sequence watermark to recover missed server frames after reconnection.        |
 
 ---
 
@@ -139,10 +139,10 @@ Navigate to `http://localhost:3000`.
 
 The recordings demonstrate the console handling latency spikes, out-of-order execution, dropped sockets, and 500 KB+ JSON frames without visible regressions.
 
-| Mode | Recording |
-| :--- | :--- |
-| Chaos Mode | [media/chaos_mode_flow.webp](./new_media/chaos_mode_flow.mp4) |
-| Normal Mode | [media/normal_mode_flow.webp](./new_media/normal_mode_flow.mp4) |
+| Mode        | Recording                                                    |
+| :---------- | :----------------------------------------------------------- |
+| Chaos Mode  | [media/chaos_mode_flow.webp](./media/chaos_mode_flow.webp)   |
+| Normal Mode | [media/normal_mode_flow.webp](./media/normal_mode_flow.webp) |
 
 ---
 
