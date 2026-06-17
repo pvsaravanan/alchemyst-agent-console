@@ -141,8 +141,8 @@ The recordings demonstrate the console handling latency spikes, out-of-order exe
 
 | Mode | Recording |
 | :--- | :--- |
-| Chaos Mode | [media/chaos_mode_flow.webp](./media/chaos_mode_flow.webp) |
-| Normal Mode | [media/normal_mode_flow.webp](./media/normal_mode_flow.webp) |
+| Chaos Mode | [media/chaos_mode_flow.webp](./new_media/chaos_mode_flow.mp4) |
+| Normal Mode | [media/normal_mode_flow.webp](./new_media/normal_mode_flow.mp4) |
 
 ---
 
