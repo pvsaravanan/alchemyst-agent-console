@@ -152,16 +152,16 @@ The recordings demonstrate the console handling latency spikes, out-of-order exe
 
 Preceding text pauses, a pending tool card appears inline, and the trace timeline records all frames in sequence.
 
-![Streaming and Tool Call Card](./media/stream_in_progress.png)
+![Streaming and Tool Call Card](./new_media/stream_in_progress.png)
 
 ### Bidirectional Scroll Highlighting
 
 Clicking a tool card in the chat scrolls the timeline to its corresponding `TOOL_CALL` trace entry and flashes a pulse highlight. Clicking a timeline event scrolls the chat panel back to that element.
 
-![Bidirectional Highlight Link](./media/tool_call_scrolled.png)
+![Bidirectional Highlight Link](./new_media/tool_call_scrolled.png)
 
 ### Differential Context Inspector
 
 Computes deep nested JSON differences, highlighting added keys in green, deleted keys in red, and modified values in amber. Includes a scrubbing history slider for reviewing prior snapshots.
 
-![Context Diff and Scrubber](./media/large_context_streaming.png)
+![Context Diff and Scrubber](./new_media/large_context_streaming.png)

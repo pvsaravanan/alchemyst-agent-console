@@ -105,8 +105,7 @@ export default function Home() {
       {/* Header */}
       <header className="header">
         <div className="logo-section">
-          <div className="logo-mark">A</div>
-          <span className="logo-text">Alchemyst AI</span>
+          <img src="/logo.webp" alt="Alchemyst AI" className="logo-image" />
           <div className="logo-divider" />
           <span className="logo-version">Agent Console</span>
         </div>

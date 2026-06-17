@@ -116,6 +116,14 @@ body {
   letter-spacing: -0.02em;
 }
 
+.logo-image {
+  height: 28px;
+  width: auto;
+  max-width: 140px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
 .logo-divider {
   width: 1px;
   height: 14px;
