@@ -24,13 +24,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   serverMode,
 }) => {
   const [inputValue, setInputValue] = useState("");
-  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,29 +37,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setInputValue("");
   };
 
+  const isBlocked = status === "STREAMING" || status === "TOOL_CALL_PENDING";
+
   const suggestions = [
-    { label: "Greeting",             text: "hello" },
-    { label: "Q3 Summary",           text: "Summarize the Q3 report" },
-    { label: "Analysis (2 Tools)",   text: "Compare and analyze the market trends" },
-    { label: "Search (Tool First)",  text: "lookup the database" },
-    { label: "Large Context 500KB",  text: "schema query large database" },
-    { label: "Long Document",        text: "generate detailed long report" },
+    { label: "Greeting",           text: "hello" },
+    { label: "Q3 Summary",         text: "Summarize the Q3 report" },
+    { label: "Analysis (2 Tools)", text: "Compare and analyze the market trends" },
+    { label: "Tool First",         text: "lookup the database" },
+    { label: "Large Context",      text: "schema query large database" },
+    { label: "Long Document",      text: "generate detailed long report" },
   ];
 
   return (
     <div className="main-panel">
       {/* Messages */}
-      <div className="chat-container" ref={chatContainerRef}>
+      <div className="chat-container">
         {messages.length === 0 && (
           <div className="empty-state">
+            <div className="empty-state-icon">⌘</div>
             <h2>Agent Console</h2>
-            <p>Select a template below or type a message to begin streaming.</p>
+            <p>Select a template below or type a message to start streaming a response.</p>
           </div>
         )}
 
         {messages.map((msg, msgIdx) => {
           const isLastMessage = msgIdx === messages.length - 1;
-
           return (
             <div key={msg.id} className={`message-row ${msg.sender}`}>
               <div className="message-bubble">
@@ -75,14 +74,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
                 {msg.blocks.map((block, blockIdx) => {
                   const isLastBlock = blockIdx === msg.blocks.length - 1;
-
                   if (block.type === "text") {
                     const isStreamingNow =
                       msg.sender === "agent" &&
                       isLastMessage &&
                       isLastBlock &&
                       status === "STREAMING";
-
                     return (
                       <span
                         key={blockIdx}
@@ -115,55 +112,56 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Error */}
-      {error && <div className="error-banner">{error}</div>}
+      {/* Bottom area */}
+      <div className="chat-bottom">
+        {/* Error */}
+        {error && <div className="error-banner">{error}</div>}
 
-      {/* Suggestion Chips */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem", marginBottom: "0.75rem" }}>
-        {suggestions.map((s) => (
-          <button
-            key={s.label}
-            className="chip"
-            onClick={() => setInputValue(s.text)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Input */}
-      <form onSubmit={handleSubmit} className="input-section">
-        <div className="input-container">
-          <input
-            type="text"
-            className="text-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a message…"
-            disabled={status === "STREAMING" || status === "TOOL_CALL_PENDING"}
-          />
-          <button
-            type="submit"
-            className="btn-primary"
-            disabled={
-              !inputValue.trim() ||
-              status === "STREAMING" ||
-              status === "TOOL_CALL_PENDING"
-            }
-          >
-            Send
-          </button>
+        {/* Suggestions */}
+        <div className="chips-row">
+          {suggestions.map((s) => (
+            <button
+              key={s.label}
+              className="chip"
+              onClick={() => setInputValue(s.text)}
+            >
+              {s.label}
+            </button>
+          ))}
         </div>
 
+        {/* Input */}
+        <form onSubmit={handleSubmit}>
+          <div className="input-container">
+            <input
+              type="text"
+              className="text-input"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Type a message…"
+              disabled={isBlocked}
+            />
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={!inputValue.trim() || isBlocked}
+            >
+              Send
+            </button>
+          </div>
+        </form>
+
+        {/* Mode + Reset */}
         <div className="action-row">
-          <span className="mode-text">
-            Mode: <strong>{serverMode}</strong>
-          </span>
+          <div className="mode-badge">
+            <span>Mode</span>
+            <strong>{serverMode}</strong>
+          </div>
           <button type="button" className="btn-secondary" onClick={resetSession}>
             Reset session
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 };

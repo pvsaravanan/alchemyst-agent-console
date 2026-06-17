@@ -22,7 +22,6 @@ export default function Home() {
   const [serverMode, setServerMode] = useState<string>("normal");
   const [highlightedTimelineId, setHighlightedTimelineId] = useState<string | null>(null);
   const [highlightedChatId, setHighlightedChatId] = useState<string | null>(null);
-
   const [contextExpanded, setContextExpanded] = useState(true);
   const [timelineExpanded, setTimelineExpanded] = useState(true);
 
@@ -48,14 +47,13 @@ export default function Home() {
     (eventId: string, chatTargetId: string | null) => {
       setHighlightedTimelineId(eventId);
       setTimeout(() => setHighlightedTimelineId(null), 2000);
-
       if (chatTargetId) {
         setHighlightedChatId(chatTargetId);
         setTimeout(() => setHighlightedChatId(null), 2000);
-        const element =
+        const el =
           document.getElementById(`chat-tool-${chatTargetId}`) ||
           document.getElementById(chatTargetId);
-        if (element) element.scrollIntoView({ behavior: "smooth", block: "center" });
+        el?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     },
     []
@@ -65,18 +63,17 @@ export default function Home() {
     (callId: string) => {
       setHighlightedChatId(callId);
       setTimeout(() => setHighlightedChatId(null), 2000);
-
-      const correspondingEvent = timelineEvents.find(
+      const ev = timelineEvents.find(
         (e) =>
           (e.type === "TOOL_CALL" || e.type === "TOOL_RESULT") &&
           e.payload?.call_id === callId
       );
-
-      if (correspondingEvent) {
-        setHighlightedTimelineId(correspondingEvent.id);
+      if (ev) {
+        setHighlightedTimelineId(ev.id);
         setTimeout(() => setHighlightedTimelineId(null), 2000);
-        const element = document.getElementById(`timeline-row-${correspondingEvent.id}`);
-        if (element) element.scrollIntoView({ behavior: "smooth", block: "center" });
+        document
+          .getElementById(`timeline-row-${ev.id}`)
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
       }
     },
     [timelineEvents]
@@ -84,20 +81,20 @@ export default function Home() {
 
   const getStatusText = (s: SocketStatus) => {
     switch (s) {
-      case "DISCONNECTED":       return "Disconnected";
-      case "CONNECTING":         return "Connecting";
-      case "CONNECTED":          return "Connected";
-      case "STREAMING":          return "Streaming";
-      case "TOOL_CALL_PENDING":  return "Tool executing";
-      case "RECONNECTING":       return "Reconnecting";
-      case "RESUMING":           return "Resuming";
-      default:                   return "Offline";
+      case "DISCONNECTED":      return "Disconnected";
+      case "CONNECTING":        return "Connecting";
+      case "CONNECTED":         return "Connected";
+      case "STREAMING":         return "Streaming";
+      case "TOOL_CALL_PENDING": return "Tool executing";
+      case "RECONNECTING":      return "Reconnecting";
+      case "RESUMING":          return "Resuming";
+      default:                  return "Offline";
     }
   };
 
   return (
     <div className="dashboard">
-      {/* Reconnect Banner */}
+      {/* Reconnect overlay */}
       {(status === "RECONNECTING" || status === "RESUMING") && (
         <div className="overlay-reconnect">
           <div className="status-dot connecting" />
@@ -110,19 +107,17 @@ export default function Home() {
         <div className="logo-section">
           <div className="logo-mark">A</div>
           <span className="logo-text">Alchemyst AI</span>
+          <div className="logo-divider" />
           <span className="logo-version">Agent Console</span>
         </div>
 
         <div className="status-badge">
-          <div
-            className={`status-dot ${status.toLowerCase()}`}
-            title={getStatusText(status)}
-          />
+          <div className={`status-dot ${status.toLowerCase()}`} title={getStatusText(status)} />
           <span className="status-label">{getStatusText(status)}</span>
         </div>
       </header>
 
-      {/* Main: Chat */}
+      {/* Chat panel */}
       <ChatPanel
         messages={messages}
         status={status}
@@ -134,7 +129,7 @@ export default function Home() {
         serverMode={serverMode}
       />
 
-      {/* Side: Context + Timeline */}
+      {/* Side panel */}
       <aside className="side-panel">
         {/* Context Inspector */}
         <div
@@ -143,18 +138,15 @@ export default function Home() {
             flexDirection: "column",
             flex: contextExpanded ? (timelineExpanded ? "1" : "2") : "0 0 auto",
             minHeight: 0,
-            borderBottom: "1px solid var(--border)",
+            borderBottom: "1px solid var(--b0)",
             transition: "flex 0.2s ease",
+            overflow: "hidden",
           }}
         >
-          <div
-            className="section-header"
-            onClick={() => setContextExpanded(!contextExpanded)}
-          >
+          <div className="section-header" onClick={() => setContextExpanded(!contextExpanded)}>
             <span className="section-title">Context Inspector</span>
             <span className="section-toggle">{contextExpanded ? "−" : "+"}</span>
           </div>
-
           {contextExpanded && (
             <div className="section-body">
               <ContextInspector
@@ -174,16 +166,13 @@ export default function Home() {
             flex: timelineExpanded ? (contextExpanded ? "1" : "2") : "0 0 auto",
             minHeight: 0,
             transition: "flex 0.2s ease",
+            overflow: "hidden",
           }}
         >
-          <div
-            className="section-header"
-            onClick={() => setTimelineExpanded(!timelineExpanded)}
-          >
+          <div className="section-header" onClick={() => setTimelineExpanded(!timelineExpanded)}>
             <span className="section-title">Trace Timeline</span>
             <span className="section-toggle">{timelineExpanded ? "−" : "+"}</span>
           </div>
-
           {timelineExpanded && (
             <div className="section-body">
               <TraceTimeline
