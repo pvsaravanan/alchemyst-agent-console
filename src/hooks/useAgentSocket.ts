@@ -182,7 +182,9 @@ export function useAgentSocket() {
       case "TOKEN": {
         const streamId = msg.stream_id;
         activeStreamIdRef.current = streamId;
-        updateStatus("STREAMING");
+        // Only transition to STREAMING from stable states — never override RECONNECTING
+        const stableForToken = statusRef.current === "CONNECTED" || statusRef.current === "STREAMING" || statusRef.current === "TOOL_CALL_PENDING" || statusRef.current === "RESUMING";
+        if (stableForToken) updateStatus("STREAMING");
 
         const text = msg.text;
         const currentMessages = messagesRef.current;
@@ -257,7 +259,9 @@ export function useAgentSocket() {
       case "TOOL_RESULT": {
         const callId = msg.call_id;
         const result = msg.result || {};
-        updateStatus("STREAMING"); // Return to streaming status
+        // Only move back to STREAMING from stable states — don't override RECONNECTING/RESUMING
+        const stableForResult = statusRef.current === "TOOL_CALL_PENDING" || statusRef.current === "STREAMING" || statusRef.current === "CONNECTED";
+        if (stableForResult) updateStatus("STREAMING");
 
         const currentMessages = messagesRef.current;
         let updated = false;
