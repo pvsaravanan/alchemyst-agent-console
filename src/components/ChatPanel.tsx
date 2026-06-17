@@ -27,7 +27,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto scroll to bottom when messages update
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -41,28 +40,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     setInputValue("");
   };
 
-  // Quick suggestion chips to trigger server scripts
   const suggestions = [
-    { label: "Greeting", text: "hello" },
-    { label: "Q3 Summary (1 Tool)", text: "Summarize the Q3 report" },
-    { label: "Analysis (2 Tools)", text: "Compare and analyze the market trends" },
-    { label: "Search (Tool First)", text: "lookup the database" },
-    { label: "Large Context (500KB)", text: "schema query large database" },
-    { label: "Long Document", text: "generate detailed long report" },
+    { label: "Greeting",             text: "hello" },
+    { label: "Q3 Summary",           text: "Summarize the Q3 report" },
+    { label: "Analysis (2 Tools)",   text: "Compare and analyze the market trends" },
+    { label: "Search (Tool First)",  text: "lookup the database" },
+    { label: "Large Context 500KB",  text: "schema query large database" },
+    { label: "Long Document",        text: "generate detailed long report" },
   ];
 
   return (
     <div className="main-panel">
-      {/* Messages Scroll Area */}
+      {/* Messages */}
       <div className="chat-container" ref={chatContainerRef}>
         {messages.length === 0 && (
-          <div style={{ margin: "auto", textAlign: "center", padding: "2rem", color: "var(--text-secondary)" }}>
-            <h2 style={{ fontFamily: "var(--font-display)", fontWeight: 600, color: "#fff", marginBottom: "0.5rem" }}>
-              Agent Console Active
-            </h2>
-            <p style={{ maxWidth: "360px", fontSize: "0.9rem" }}>
-              Send a trigger message below or use a quick script template to start streaming responses.
-            </p>
+          <div className="empty-state">
+            <h2>Agent Console</h2>
+            <p>Select a template below or type a message to begin streaming.</p>
           </div>
         )}
 
@@ -73,11 +67,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             <div key={msg.id} className={`message-row ${msg.sender}`}>
               <div className="message-bubble">
                 {msg.sender === "agent" && (
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                    <div className="status-dot connected" style={{ width: "6px", height: "6px" }}></div>
-                    <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase" }}>
-                      AI Agent
-                    </span>
+                  <div className="agent-label">
+                    <div className="agent-label-dot" />
+                    <span className="agent-label-text">Agent</span>
                   </div>
                 )}
 
@@ -102,7 +94,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     );
                   } else {
                     return (
-                      <div key={blockIdx} style={{ margin: "0.75rem 0" }}>
+                      <div key={blockIdx} style={{ margin: "0.5rem 0" }}>
                         <ToolCallCard
                           callId={block.callId}
                           toolName={block.toolName}
@@ -123,39 +115,23 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Error Banner */}
-      {error && (
-        <div
-          style={{
-            padding: "0.75rem 1rem",
-            background: "var(--accent-rose-glow)",
-            border: "1px solid var(--accent-rose)",
-            color: "var(--accent-rose)",
-            borderRadius: "8px",
-            fontSize: "0.85rem",
-            marginBottom: "1rem",
-            fontWeight: 500,
-          }}
-        >
-          {error}
-        </div>
-      )}
+      {/* Error */}
+      {error && <div className="error-banner">{error}</div>}
 
       {/* Suggestion Chips */}
-      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "1rem" }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.375rem", marginBottom: "0.75rem" }}>
         {suggestions.map((s) => (
           <button
             key={s.label}
-            className="btn-secondary"
+            className="chip"
             onClick={() => setInputValue(s.text)}
-            style={{ padding: "0.35rem 0.75rem", fontSize: "0.75rem", borderRadius: "20px" }}
           >
             {s.label}
           </button>
         ))}
       </div>
 
-      {/* Input Section */}
+      {/* Input */}
       <form onSubmit={handleSubmit} className="input-section">
         <div className="input-container">
           <input
@@ -163,34 +139,28 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             className="text-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type a trigger keyword like 'hello', 'q3', 'compare'..."
+            placeholder="Type a message…"
             disabled={status === "STREAMING" || status === "TOOL_CALL_PENDING"}
           />
           <button
             type="submit"
             className="btn-primary"
             disabled={
-              !inputValue.trim() || status === "STREAMING" || status === "TOOL_CALL_PENDING"
+              !inputValue.trim() ||
+              status === "STREAMING" ||
+              status === "TOOL_CALL_PENDING"
             }
           >
             Send
           </button>
         </div>
+
         <div className="action-row">
-          <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-            Server Mode:{" "}
-            <span
-              style={{
-                color: serverMode === "chaos" ? "var(--accent-rose)" : "var(--accent-emerald)",
-                fontWeight: 700,
-                textTransform: "uppercase",
-              }}
-            >
-              {serverMode}
-            </span>
+          <span className="mode-text">
+            Mode: <strong>{serverMode}</strong>
           </span>
           <button type="button" className="btn-secondary" onClick={resetSession}>
-            Reset Session
+            Reset session
           </button>
         </div>
       </form>

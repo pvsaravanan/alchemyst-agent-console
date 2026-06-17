@@ -28,30 +28,25 @@ export const ToolCallCard: React.FC<ToolCallCardProps> = ({
     >
       <div className="tool-header">
         <div className="tool-title">
-          <span style={{ color: "var(--text-muted)" }}>⚙</span>
+          <span className="tool-icon">fn</span>
           <span>{toolName}</span>
         </div>
         <div className={`tool-badge ${status}`}>
-          {status === "waiting" ? "executing..." : "completed"}
+          {status === "waiting" ? "executing" : "done"}
         </div>
       </div>
+
       <div className="tool-body">
         <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
           <div>
-            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-              Arguments:
-            </span>
+            <span className="tool-label">Arguments</span>
             <pre className="json-block">{JSON.stringify(args, null, 2)}</pre>
           </div>
 
           {result && (
-            <div style={{ marginTop: "0.5rem" }}>
-              <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", display: "block", marginBottom: "0.25rem" }}>
-                Result:
-              </span>
-              <pre className="json-block" style={{ color: "var(--accent-emerald)" }}>
-                {JSON.stringify(result, null, 2)}
-              </pre>
+            <div>
+              <span className="tool-label">Result</span>
+              <pre className="json-block">{JSON.stringify(result, null, 2)}</pre>
             </div>
           )}
         </div>
