@@ -1,73 +1,76 @@
-# Alchemyst AI - Resilient Agent Console
+# Alchemyst AI — Resilient Agent Console
+
 [![Next.js](https://img.shields.io/badge/Next.js-16.2-black?style=flat-square&logo=next.js)](https://nextjs.org/)
 [![React](https://img.shields.io/badge/React-19.0-blue?style=flat-square&logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Jest](https://img.shields.io/badge/Jest-30.0-red?style=flat-square&logo=jest)](https://jestjs.io/)
 
-A state-of-the-art **Agent Console** built on **Next.js 16 (App Router, React 19, and strict TypeScript)**. It connects to a mock AI agent backend over WebSockets, rendering token streams, tool cards, trace timelines, and differential context diffs under standard and extreme network scenarios.
+A production-grade **Agent Console** built on **Next.js 16 (App Router)** with **React 19** and **strict TypeScript**. The application connects to a mock AI agent backend over WebSockets and renders token streams, tool cards, trace timelines, and differential context diffs under both standard and extreme network conditions.
 
-The console is specifically engineered to survive all **Chaos Mode** failure modes (connection drops, shuffled packets, duplicate frames, delayed heartbeats, and massive context payloads) without UI freezes or layout jumps.
-
----
-
-## 🚀 Key Features
-
-* **Strict Sequenced Rendering:** All packets are buffered and sorted in sequence order before committing to the DOM.
-* **Layout-Shift-Free Streaming:** Uses structured content block arrays so tool card insertions interrupt and resume streaming without visual shifts.
-* **Lazy Differential Trees:** Computes deep recursive nested JSON differences and mounts nodes lazily, allowing instant renders of 500KB+ state models.
-* **Stale Connection Guards:** Double-buffered socket listeners protect active socket references from asynchronous callback pollution during reconnect cycles.
+The console is engineered to survive all **Chaos Mode** failure modes — connection drops, shuffled packets, duplicate frames, delayed heartbeats, and massive context payloads — without UI freezes or layout shifts.
 
 ---
 
-## 🏛️ Architecture & Priorities
+## Key Features
 
-The application isolates the raw WebSocket network layer from React's virtual DOM reconciliation by utilizing pure, testable utility classes:
+| Feature | Description |
+| :--- | :--- |
+| **Strict Sequenced Rendering** | All packets are buffered and sorted by sequence number before any DOM commit. |
+| **Layout-Shift-Free Streaming** | Structured content block arrays allow tool card insertions to interrupt and resume streaming without visual artifacts. |
+| **Lazy Differential Trees** | Deep recursive JSON differences are computed and mounted lazily, enabling instant renders of 500 KB+ state models. |
+| **Stale Connection Guards** | Double-buffered socket listeners prevent asynchronous callback pollution from discarded sockets during reconnect cycles. |
+
+---
+
+## Architecture
+
+The application decouples the raw WebSocket network layer from React's virtual DOM reconciliation by routing all events through pure, independently testable utility modules.
 
 ```mermaid
 graph TD
-    WS[WebSocket connection] -->|Raw Event| SocketHook[useAgentSocket.ts]
-    SocketHook -->|Immediate ACK/Pong| WS
+    WS[WebSocket Connection] -->|Raw Event| SocketHook[useAgentSocket.ts]
+    SocketHook -->|Immediate ACK / PONG| WS
     SocketHook -->|Enqueue Event| ReorderBuffer[reorderBuffer.ts]
     ReorderBuffer -->|Sequenced Packet Chunk| ReactState[React State Engine]
-    ReactState -->|Deep JSON diff| DiffEngine[diffEngine.ts]
-    ReactState -->|Render UI| View[Dashboard Layout]
+    ReactState -->|Deep JSON Diff| DiffEngine[diffEngine.ts]
+    ReactState -->|Render| View[Dashboard Layout]
 ```
 
 > [!NOTE]
-> **Priority Decision:** We prioritized **resiliency and visual state correctness** over visual design fluff. The styling uses custom CSS variables with a dark glassmorphic interface that remains completely functional and responsive under active stress.
+> **Design Priority:** Resiliency and visual state correctness were prioritised over decorative styling. The interface uses CSS custom properties with a dark glassmorphic theme that remains fully functional under sustained network stress.
 
 ---
 
-## ⚡ Chaos Mode Resiliency Matrix
+## Chaos Mode Resiliency Matrix
 
-| Chaos Failure Mode | Server Behavior | Client Resiliency Mechanism (Our Solution) |
+| Failure Mode | Server Behaviour | Client Resiliency Mechanism |
 | :--- | :--- | :--- |
-| **Connection Drop Mid-Stream** | Socket connection is forcefully terminated mid-sentence. | <ul><li>Triggers automatic reconnection using exponential backoff (capped at 10s).</li><li>Sends a `RESUME(last_seq)` handshake immediately upon reconnection.</li><li>Server replays missed events; client deduplicates and stitches them in order.</li></ul> |
-| **Out-of-Order Messages** | Packets are shuffled and delivered out of sequential order. | <ul><li>Packets are held in a `ReorderBuffer` queue.</li><li>Resolves sequence gaps before releasing consecutive events to the React rendering state.</li></ul> |
-| **Duplicate Message Delivery** | Duplicate frames with the same sequence are transmitted. | <ul><li>Maintains a lookup `Set<number>` of processed sequences.</li><li>Discards duplicate frames in $O(1)$ time.</li></ul> |
-| **Oversized Context Snapshot** | Dispatches a 500KB+ JSON schema object. | <ul><li>Uses `diffEngine.ts` to compute recursive leaf differences.</li><li>Renders tree nodes recursively and **lazily** (children only mount in DOM on expand), keeping initial paint at $O(1)$.</li></ul> |
-| **Corrupt Heartbeat** | Sends a `PING` with an empty challenge string. | <ul><li>Safely defaults the challenge to `""`.</li><li>Echoes back a valid `PONG` to prevent server-side connection termination.</li></ul> |
-| **Stale Socket Closures** | Connection replacements fire old close events asynchronously. | <ul><li>Employs active-socket identity guards (`if (socketRef.current !== ws) return`) on all handlers.</li><li>Stops old, discarded sockets from resetting active connections to `DISCONNECTED`.</li></ul> |
+| **Connection Drop Mid-Stream** | Socket forcefully terminated mid-sentence. | Exponential-backoff reconnect (capped at 10 s). Sends `RESUME(last_seq)` on reconnect; server replays missed events, client deduplicates and stitches them in order. |
+| **Out-of-Order Messages** | Packets delivered in shuffled sequence order. | `ReorderBuffer` holds packets and resolves sequence gaps before releasing consecutive events to the render state. |
+| **Duplicate Frame Delivery** | Identical frames transmitted more than once. | A `Set<number>` of processed sequence IDs discards duplicates in O(1) time. |
+| **Oversized Context Snapshot** | 500 KB+ JSON schema object dispatched. | `diffEngine.ts` computes recursive leaf differences. Tree nodes are mounted lazily — children only enter the DOM on user expansion — keeping initial paint at O(1). |
+| **Corrupt Heartbeat** | `PING` sent with an empty challenge string. | Challenge defaults safely to `""`. A valid `PONG` is echoed immediately to prevent server-side timeout termination. |
+| **Stale Socket Closures** | Old close events fire asynchronously after socket replacement. | Active-socket identity guards (`if (socketRef.current !== ws) return`) on all handlers prevent discarded sockets from resetting the active connection state. |
 
 ---
 
-## 📊 WebSocket Protocol Handlers
+## WebSocket Protocol Handlers
 
 | Event Type | Direction | Payload Structure | Client Action |
 | :--- | :---: | :--- | :--- |
-| **`USER_MESSAGE`** | `Out` | `{"type": "USER_MESSAGE", "content": "..."}` | Resets client sequence trackers and sends user input to the backend. |
-| **`CONTEXT_SNAPSHOT`** | `In` | `{"type": "CONTEXT_SNAPSHOT", "seq": N, "data": {...}}` | Parses state variables, runs diff engine, and renders lazy trees. |
-| **`TOKEN`** | `In` | `{"type": "TOKEN", "seq": N, "text": "..."}` | Appends characters to the active chat bubble and groups logs. |
-| **`TOOL_CALL`** | `In` | `{"type": "TOOL_CALL", "seq": N, "call_id": "..."}` | Bypasses queue to immediately send `TOOL_ACK`, then enqueues card. |
-| **`TOOL_ACK`** | `Out` | `{"type": "TOOL_ACK", "call_id": "..."}` | Acknowledges tool call receipt within the server's 5s timeout window. |
-| **`TOOL_RESULT`** | `In` | `{"type": "TOOL_RESULT", "seq": N, "result": {...}}` | Resolves the pending tool card in-place and resumes token streaming. |
-| **`STREAM_END`** | `In` | `{"type": "STREAM_END", "seq": N}` | Finalizes the stream and returns socket status to Connected & Idle. |
-| **`PING` / `PONG`** | `In` / `Out` | `{"type": "PING", "challenge": "..."}` | Verifies connection health; client replies within 3 seconds. |
-| **`RESUME`** | `Out` | `{"type": "RESUME", "last_seq": N}` | Transmits sequence watermark to recover missed server frames. |
+| `USER_MESSAGE` | Out | `{"type": "USER_MESSAGE", "content": "..."}` | Resets sequence trackers and transmits user input to the backend. |
+| `CONTEXT_SNAPSHOT` | In | `{"type": "CONTEXT_SNAPSHOT", "seq": N, "data": {...}}` | Parses state variables, runs the diff engine, and renders lazy trees. |
+| `TOKEN` | In | `{"type": "TOKEN", "seq": N, "text": "..."}` | Appends characters to the active chat bubble and groups trace logs. |
+| `TOOL_CALL` | In | `{"type": "TOOL_CALL", "seq": N, "call_id": "..."}` | Bypasses the reorder queue to immediately send `TOOL_ACK`, then enqueues the tool card. |
+| `TOOL_ACK` | Out | `{"type": "TOOL_ACK", "call_id": "..."}` | Acknowledges tool call receipt within the server's 5 s timeout window. |
+| `TOOL_RESULT` | In | `{"type": "TOOL_RESULT", "seq": N, "result": {...}}` | Resolves the pending tool card in-place and resumes token streaming. |
+| `STREAM_END` | In | `{"type": "STREAM_END", "seq": N}` | Finalises the stream and returns the socket status to Connected / Idle. |
+| `PING` / `PONG` | In / Out | `{"type": "PING", "challenge": "..."}` | Verifies connection health; client replies within 3 s. |
+| `RESUME` | Out | `{"type": "RESUME", "last_seq": N}` | Transmits sequence watermark to recover missed server frames after reconnection. |
 
 ---
 
-## 🗺️ WebSocket Connection State Machine
+## WebSocket Connection State Machine
 
 ```mermaid
 stateDiagram-v2
@@ -79,77 +82,86 @@ stateDiagram-v2
     STREAMING --> TOOL_CALL_PENDING : TOOL_CALL event
     STREAMING --> CONNECTED : STREAM_END event
     TOOL_CALL_PENDING --> STREAMING : TOOL_RESULT event
-    
-    CONNECTED --> RECONNECTING : ws.onclose (Connection drop)
-    STREAMING --> RECONNECTING : ws.onclose (Connection drop)
-    TOOL_CALL_PENDING --> RECONNECTING : ws.onclose (Connection drop)
-    
-    RECONNECTING --> RESUMING : Reconnect success -> Send RESUME(last_seq)
-    RESUMING --> CONNECTED : Replays completed
-    RECONNECTING --> DISCONNECTED : Manual Reset / Stale Guard Trigger
+
+    CONNECTED --> RECONNECTING : ws.onclose (connection drop)
+    STREAMING --> RECONNECTING : ws.onclose (connection drop)
+    TOOL_CALL_PENDING --> RECONNECTING : ws.onclose (connection drop)
+
+    RECONNECTING --> RESUMING : Reconnect success — Send RESUME(last_seq)
+    RESUMING --> CONNECTED : Replay complete
+    RECONNECTING --> DISCONNECTED : Manual reset / stale guard trigger
 ```
 
 ---
 
-## 🛠️ How to Run the Application
+## Running the Application
 
 ### Prerequisites
-* **Node.js 20+** installed
-* **Docker** installed and running
 
-### Step 1: Start the Backend Server
-Build and run the mock agent server in your terminal:
+- Node.js 20 or later
+- Docker Desktop (installed and running)
+
+### Step 1 — Start the Backend Server
+
 ```bash
-# Navigate to the server folder
 cd agent-server
 
-# Build the server Docker image
+# Build the server image
 docker build -t agent-server .
 
-# Run in Normal Mode (Tutorial mode)
+# Normal mode (tutorial scenario)
 docker run -p 4747:4747 agent-server
 
-# OR Run in Chaos Mode (Job mode - simulates heavy packet loss and latency)
+# Chaos mode (simulates packet loss, reordering, and latency)
 docker run -p 4747:4747 agent-server --mode chaos
 ```
 
-### Step 2: Start the Next.js Frontend Console
-Open a new terminal window in the root directory:
+### Step 2 — Start the Frontend Console
+
+Open a new terminal in the project root:
+
 ```bash
 # Install dependencies
 npm install
 
-# Run Jest unit tests to verify reordering and diff correctness
+# Run unit tests (reorder buffer and diff engine)
 npm run test
 
-# Run Next.js in development mode
+# Start the development server
 npm run dev
-
-# Open in browser: navigate to http://localhost:3000
 ```
 
----
-
-## 🎥 Chaos Survival Screen Recording (Task 5)
-
-The screen recordings demonstrate the console handling latency spikes, out-of-order execution, dropped sockets, and 500KB+ JSON frames:
-
-* **Chaos Mode Video Recording:** [media/chaos_mode_flow.webp](./media/chaos_mode_flow.webp)
-* **Normal Mode Video Recording:** [media/normal_mode_flow.webp](./media/normal_mode_flow.webp)
+Navigate to `http://localhost:3000`.
 
 ---
 
-## 🖼️ Normal Mode Walkthrough Screenshots
+## Chaos Survival Recordings (Task 5)
 
-### A. Streamed Response with Tool Call & Trace Timeline
-Preceding text freezes, a pending tool card appears, and the trace timeline records all frames.
+The recordings demonstrate the console handling latency spikes, out-of-order execution, dropped sockets, and 500 KB+ JSON frames without visible regressions.
+
+| Mode | Recording |
+| :--- | :--- |
+| Chaos Mode | [media/chaos_mode_flow.webp](./media/chaos_mode_flow.webp) |
+| Normal Mode | [media/normal_mode_flow.webp](./media/normal_mode_flow.webp) |
+
+---
+
+## Screenshots — Normal Mode Walkthrough
+
+### Streamed Response with Tool Call and Trace Timeline
+
+Preceding text pauses, a pending tool card appears inline, and the trace timeline records all frames in sequence.
+
 ![Streaming and Tool Call Card](./media/stream_in_progress.png)
 
-### B. Bidirectional Scroll Highlighting
-Clicking a tool card in the chat scrolls the timeline to its `TOOL_CALL` trace and flashes a pulse highlight. Clicking a timeline event scrolls the chat back to that element.
+### Bidirectional Scroll Highlighting
+
+Clicking a tool card in the chat scrolls the timeline to its corresponding `TOOL_CALL` trace entry and flashes a pulse highlight. Clicking a timeline event scrolls the chat panel back to that element.
+
 ![Bidirectional Highlight Link](./media/tool_call_scrolled.png)
 
-### C. Differential Context Inspector
-Computes deep nested JSON differences, highlighting added keys in green, deleted keys in red, and modified values. Includes a scrubbing history slider.
-![Context Diff and Scrubber](./media/large_context_streaming.png)
+### Differential Context Inspector
 
+Computes deep nested JSON differences, highlighting added keys in green, deleted keys in red, and modified values in amber. Includes a scrubbing history slider for reviewing prior snapshots.
+
+![Context Diff and Scrubber](./media/large_context_streaming.png)
