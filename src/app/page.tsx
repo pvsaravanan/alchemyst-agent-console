@@ -1,65 +1,278 @@
-import Image from "next/image";
+"use client";
+
+import React, { useState, useEffect, useCallback } from "react";
+import { useAgentSocket, SocketStatus } from "../hooks/useAgentSocket";
+import { ChatPanel } from "../components/ChatPanel";
+import { TraceTimeline } from "../components/TraceTimeline";
+import { ContextInspector } from "../components/ContextInspector";
 
 export default function Home() {
+  const {
+    status,
+    messages,
+    timelineEvents,
+    contextHistory,
+    activeContextId,
+    error,
+    sendMessage,
+    resetSession,
+    setContextScrubberIndex,
+  } = useAgentSocket();
+
+  const [serverMode, setServerMode] = useState<string>("normal");
+  const [highlightedTimelineId, setHighlightedTimelineId] = useState<string | null>(null);
+  const [highlightedChatId, setHighlightedChatId] = useState<string | null>(null);
+
+  // Collapsible Right Panel sections
+  const [contextExpanded, setContextExpanded] = useState(true);
+  const [timelineExpanded, setTimelineExpanded] = useState(true);
+
+  // Sync server mode via health endpoint
+  const checkServerHealth = async () => {
+    try {
+      const res = await fetch("http://localhost:4747/health");
+      if (res.ok) {
+        const data = await res.json();
+        if (data.mode) {
+          setServerMode(data.mode);
+        }
+      }
+    } catch {
+      // Fallback silently if offline
+    }
+  };
+
+  useEffect(() => {
+    checkServerHealth();
+    const interval = setInterval(checkServerHealth, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Bidirectional highlighting: Timeline Row Click -> Scroll Chat Panel Item
+  const handleTimelineItemClick = useCallback((eventId: string, chatTargetId: string | null) => {
+    // Highlight timeline row
+    setHighlightedTimelineId(eventId);
+    setTimeout(() => setHighlightedTimelineId(null), 2000);
+
+    // Scroll chat target if exists
+    if (chatTargetId) {
+      setHighlightedChatId(chatTargetId);
+      setTimeout(() => setHighlightedChatId(null), 2000);
+
+      // Try scrolling to tool card or text bubble message
+      const element =
+        document.getElementById(`chat-tool-${chatTargetId}`) ||
+        document.getElementById(chatTargetId);
+
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, []);
+
+  // Bidirectional highlighting: Chat Item Click -> Scroll Timeline Row
+  const handleChatItemClick = useCallback((callId: string) => {
+    setHighlightedChatId(callId);
+    setTimeout(() => setHighlightedChatId(null), 2000);
+
+    // Find timeline row corresponding to this tool call
+    const correspondingEvent = timelineEvents.find(
+      (e) => (e.type === "TOOL_CALL" || e.type === "TOOL_RESULT") && e.payload?.call_id === callId
+    );
+
+    if (correspondingEvent) {
+      setHighlightedTimelineId(correspondingEvent.id);
+      setTimeout(() => setHighlightedTimelineId(null), 2000);
+
+      const element = document.getElementById(`timeline-row-${correspondingEvent.id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [timelineEvents]);
+
+  const getStatusText = (s: SocketStatus) => {
+    switch (s) {
+      case "DISCONNECTED":
+        return "Disconnected";
+      case "CONNECTING":
+        return "Connecting to agent...";
+      case "CONNECTED":
+        return "Connected & Idle";
+      case "STREAMING":
+        return "Streaming response...";
+      case "TOOL_CALL_PENDING":
+        return "Executing tool call...";
+      case "RECONNECTING":
+        return "Reconnecting (retrying)...";
+      case "RESUMING":
+        return "Replaying missed events...";
+      default:
+        return "Offline";
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="dashboard">
+      {/* Reconnection Overlay Banner (Invisible when connected, visible when reconnecting) */}
+      {(status === "RECONNECTING" || status === "RESUMING") && (
+        <div className="overlay-reconnect">
+          <div className="status-dot connecting" style={{ width: "10px", height: "10px" }}></div>
+          <span>Connection dropped. Reconnecting and recovering state...</span>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      )}
+
+      {/* Console Header */}
+      <header className="header">
+        <div className="logo-section">
+          <div
+            style={{
+              background: "linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-indigo) 100%)",
+              width: "32px",
+              height: "32px",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontWeight: 700,
+              color: "#000",
+            }}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            A
+          </div>
+          <h1 className="logo-text">Alchemyst AI</h1>
+          <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", fontWeight: 500 }}>
+            Agent Console v1.0
+          </span>
         </div>
-      </main>
+
+        <div className="status-badge">
+          <div
+            className={`status-dot ${status.toLowerCase()}`}
+            title={getStatusText(status)}
+          ></div>
+          <span style={{ fontSize: "0.85rem", fontWeight: 600 }}>{getStatusText(status)}</span>
+        </div>
+      </header>
+
+      {/* Main Panel: Interactive Chat Stream */}
+      <ChatPanel
+        messages={messages}
+        status={status}
+        sendMessage={sendMessage}
+        resetSession={resetSession}
+        error={error}
+        highlightedId={highlightedChatId}
+        onItemClick={handleChatItemClick}
+        serverMode={serverMode}
+      />
+
+      {/* Side Panel: Stacked Context Inspector + Agent Trace Timeline */}
+      <aside className="side-panel">
+        {/* Section 1: Context Inspector */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: contextExpanded ? (timelineExpanded ? "1" : "2") : "0 0 auto",
+            minHeight: "0",
+            borderBottom: "1px solid var(--border-color)",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <div
+            onClick={() => setContextExpanded(!contextExpanded)}
+            style={{
+              padding: "0.75rem 1.25rem",
+              background: "rgba(255,255,255,0.02)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              cursor: "pointer",
+              userSelect: "none",
+            }}
+          >
+            <h2
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+            >
+              <span>📁</span> Context Inspector
+            </h2>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              {contextExpanded ? "Collapse" : "Expand"}
+            </span>
+          </div>
+
+          {contextExpanded && (
+            <div style={{ flex: 1, minHeight: 0, padding: "1.25rem", overflowY: "hidden" }}>
+              <ContextInspector
+                contextHistory={contextHistory}
+                activeContextId={activeContextId}
+                setIndex={setContextScrubberIndex}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Section 2: Agent Trace Timeline */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            flex: timelineExpanded ? (contextExpanded ? "1" : "2") : "0 0 auto",
+            minHeight: "0",
+            transition: "all 0.3s ease",
+          }}
+        >
+          <div
+            onClick={() => setTimelineExpanded(!timelineExpanded)}
+            style={{
+              padding: "0.75rem 1.25rem",
+              background: "rgba(255,255,255,0.02)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              cursor: "pointer",
+              userSelect: "none",
+              borderTop: !contextExpanded ? "1px solid var(--border-color)" : undefined,
+            }}
+          >
+            <h2
+              style={{
+                fontFamily: "var(--font-display)",
+                fontWeight: 600,
+                fontSize: "0.9rem",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                gap: "0.5rem",
+              }}
+            >
+              <span>📊</span> Agent Trace Timeline
+            </h2>
+            <span style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+              {timelineExpanded ? "Collapse" : "Expand"}
+            </span>
+          </div>
+
+          {timelineExpanded && (
+            <div style={{ flex: 1, minHeight: 0, padding: "1.25rem", overflowY: "hidden" }}>
+              <TraceTimeline
+                events={timelineEvents}
+                highlightedId={highlightedTimelineId}
+                onItemClick={handleTimelineItemClick}
+              />
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
